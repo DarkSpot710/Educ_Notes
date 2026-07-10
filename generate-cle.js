@@ -7,8 +7,9 @@
 // Variables d'env nécessaires : SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 //
 // Exemples d'utilisation :
-//   node generate-cle.js --role=directeur --ecole="EPP Sainte Rita"
-//   node generate-cle.js --role=enseignant --ecole="EPP Sainte Rita" --classes="CM2 A,CM1 A"
+//   node generate-cle.js --role=enseignant --ecole="EPP Sainte Rita"
+//   node generate-cle.js --role=directeur --ecole="EPP Sainte Rita" --limite=6
+//   node generate-cle.js --role=directeur --ecole="Groupe Scolaire ABC" --limite=15
 
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
@@ -23,7 +24,6 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-// Alphabet sans caractères ambigus (pas de 0/O, 1/I/l)
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 function generateCle() {
@@ -46,7 +46,7 @@ function parseArgs() {
 }
 
 async function main() {
-  const { role, ecole, classes } = parseArgs();
+  const { role, ecole, limite } = parseArgs();
 
   if (!role || !["enseignant", "directeur"].includes(role)) {
     console.error("❌ --role doit être 'enseignant' ou 'directeur'");
@@ -54,6 +54,15 @@ async function main() {
   }
   if (!ecole) {
     console.error("❌ --ecole est requis (nom exact de l'école)");
+    process.exit(1);
+  }
+
+  // Quota par défaut selon le rôle, sauf si --limite est précisé explicitement.
+  const limiteParDefaut = role === "enseignant" ? 1 : 6;
+  const limiteClasses = limite ? parseInt(limite, 10) : limiteParDefaut;
+
+  if (Number.isNaN(limiteClasses) || limiteClasses < 1) {
+    console.error("❌ --limite doit être un nombre entier positif");
     process.exit(1);
   }
 
@@ -73,8 +82,8 @@ async function main() {
   const cle = generateCle();
   const cleHash = sha256Hex(cle);
 
-  // 3. Insérer la clé
-  const { data: cleRow, error: cleErr } = await supabase
+  // 3. Insérer la clé, avec son quota de classes
+  const { error: cleErr } = await supabase
     .from("cles_acces")
     .insert({
       cle_hash: cleHash,
@@ -82,6 +91,7 @@ async function main() {
       role,
       ecole_id: ecoleRow.id,
       actif: true,
+      limite_classes: limiteClasses,
     })
     .select("id")
     .single();
@@ -91,38 +101,14 @@ async function main() {
     process.exit(1);
   }
 
-  // 4. Si enseignant, assigner les classes fournies
-  if (role === "enseignant" && classes) {
-    const nomsClasses = classes.split(",").map((c) => c.trim());
-
-    const { data: classesRows, error: classesErr } = await supabase
-      .from("classes")
-      .select("id, nom")
-      .eq("ecole_id", ecoleRow.id)
-      .in("nom", nomsClasses);
-
-    if (classesErr || !classesRows?.length) {
-      console.warn("⚠️  Aucune classe trouvée pour les noms fournis — clé créée sans classe assignée.");
-    } else {
-      const liaisons = classesRows.map((c) => ({
-        cle_acces_id: cleRow.id,
-        classe_id: c.id,
-      }));
-      const { error: liaisonErr } = await supabase.from("enseignants_classes").insert(liaisons);
-      if (liaisonErr) {
-        console.warn("⚠️  Erreur lors de l'assignation des classes :", liaisonErr.message);
-      } else {
-        console.log(`✅ Classes assignées : ${classesRows.map((c) => c.nom).join(", ")}`);
-      }
-    }
-  }
-
   console.log("\n=================================");
-  console.log(`École        : ${ecoleRow.nom}`);
-  console.log(`Rôle         : ${role}`);
-  console.log(`Clé d'accès  : ${cle}`);
+  console.log(`École         : ${ecoleRow.nom}`);
+  console.log(`Rôle          : ${role}`);
+  console.log(`Classes max   : ${limiteClasses}`);
+  console.log(`Clé d'accès   : ${cle}`);
   console.log("=================================");
   console.log("⚠️  Cette clé ne sera plus jamais affichée en clair. Note-la maintenant.\n");
+  console.log("L'enseignant ou le directeur créera lui-même ses classes et ses élèves depuis l'app.\n");
 }
 
 main();
