@@ -15,12 +15,14 @@ export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
   const [enCours, setEnCours] = useState(false);
   const [diagnostic, setDiagnostic] = useState(null);
   const [rechargeEnCours, setRechargeEnCours] = useState(false);
+  const [sessionDebug, setSessionDebug] = useState(null);
 
   useEffect(() => {
     (async () => {
       const session = await getSession();
       const utilisees = await compterClassesDeLaCle(session.cle_acces_id);
       setQuota({ utilisees, limite: session.limite_classes ?? null });
+      setSessionDebug(session);
     })();
   }, []);
 
@@ -156,9 +158,28 @@ export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
             />
 
             {erreur && (
-              <p className="text-xs mb-4" style={{ fontFamily: "Inter, sans-serif", color: COLORS.stamp }}>
-                {erreur}
-              </p>
+              <div className="mb-4">
+                <p className="text-xs" style={{ fontFamily: "Inter, sans-serif", color: COLORS.stamp }}>
+                  {erreur}
+                </p>
+                {sessionDebug && (
+                  <pre
+                    className="text-[10px] mt-2 p-2 rounded overflow-x-auto"
+                    style={{ background: "#F1EFE6", fontFamily: "IBM Plex Mono, monospace", color: COLORS.text, whiteSpace: "pre-wrap" }}
+                  >
+                    {JSON.stringify(
+                      {
+                        role: sessionDebug.role,
+                        ecole_id: sessionDebug.ecole_id,
+                        cle_acces_id: sessionDebug.cle_acces_id,
+                        limite_classes: sessionDebug.limite_classes,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                )}
+              </div>
             )}
 
             <button
