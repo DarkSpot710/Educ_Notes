@@ -136,6 +136,7 @@ export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEl
                 </div>
 
                 <input
+                  key={`${typeEval.id}-${matiere.id}-${s.id}`}
                   type="text"
                   inputMode="decimal"
                   placeholder="—"

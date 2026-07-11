@@ -1,17 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ArrowLeft, Plus, Trash2, Check } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Check, Upload, ArrowRight } from "lucide-react";
 import { db } from "../lib/db";
 import { COLORS, initials } from "../theme";
-import { ajouterEleves } from "../lib/sync";
+import { ajouterEleves, supprimerEleve } from "../lib/sync";
+import { parserFichierEleves } from "../lib/export";
 
-export default function ScreenAjoutEleves({ classe, onRetour }) {
+export default function ScreenAjoutEleves({ classe, onRetour, onAllerSaisie }) {
   const elevesExistants = useLiveQuery(() => db.eleves.where("classe_id").equals(classe.id).sortBy("nom"), [classe.id]) ?? [];
 
   const [brouillon, setBrouillon] = useState([{ matricule: "", nom: "", prenoms: "" }]);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
   const [succes, setSucces] = useState(null);
+  const [suppressionEnCours, setSuppressionEnCours] = useState(null);
+  const fileInputRef = useRef(null);
 
   function updateLigne(i, champ, valeur) {
     const copie = [...brouillon];
@@ -25,6 +28,26 @@ export default function ScreenAjoutEleves({ classe, onRetour }) {
 
   function retirerLigne(i) {
     setBrouillon(brouillon.filter((_, idx) => idx !== i));
+  }
+
+  async function handleImportFichier(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setErreur(null);
+    try {
+      const importes = await parserFichierEleves(file);
+      if (!importes.length) {
+        setErreur("Aucun élève reconnu dans ce fichier. Vérifie qu'il a des colonnes Matricule/Nom/Prénoms.");
+        return;
+      }
+      // Remplace le brouillon vide par les lignes importées, prêtes à vérifier avant enregistrement.
+      setBrouillon(importes);
+      setSucces(`${importes.length} élève(s) importé(s) du fichier — vérifie puis enregistre.`);
+    } catch (err) {
+      setErreur("Impossible de lire ce fichier. Formats acceptés : .xlsx, .xls, .csv");
+    } finally {
+      e.target.value = "";
+    }
   }
 
   async function handleEnregistrer() {
@@ -53,13 +76,25 @@ export default function ScreenAjoutEleves({ classe, onRetour }) {
     }
   }
 
+  async function handleSupprimer(eleveId) {
+    if (!window.confirm("Supprimer cet élève et toutes ses notes ? Cette action est irréversible.")) return;
+    setSuppressionEnCours(eleveId);
+    try {
+      await supprimerEleve(eleveId, classe.id);
+    } catch (e) {
+      setErreur(navigator.onLine ? e.message : "Connexion internet requise pour supprimer un élève.");
+    } finally {
+      setSuppressionEnCours(null);
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="px-5 pt-6 pb-4 flex items-center gap-2" style={{ background: COLORS.chalk }}>
         <button onClick={onRetour}>
           <ArrowLeft size={18} color={COLORS.paper} />
         </button>
-        <div>
+        <div className="flex-1">
           <span className="text-lg block" style={{ fontFamily: "Fraunces, serif", fontWeight: 600, color: COLORS.paper }}>
             Ajouter des élèves
           </span>
@@ -67,9 +102,33 @@ export default function ScreenAjoutEleves({ classe, onRetour }) {
             {classe.nom} · {elevesExistants.length} déjà inscrit(s)
           </span>
         </div>
+        {onAllerSaisie && elevesExistants.length > 0 && (
+          <button
+            onClick={onAllerSaisie}
+            className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg"
+            style={{ background: COLORS.stamp, color: COLORS.paper, fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+          >
+            Saisir les notes <ArrowRight size={13} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          onChange={handleImportFichier}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-lg"
+          style={{ background: "#F1EFE6", border: `1.5px dashed ${COLORS.line}`, fontFamily: "Inter, sans-serif", fontWeight: 600, color: COLORS.ink, fontSize: 13 }}
+        >
+          <Upload size={15} /> Importer depuis un fichier (.xlsx, .csv)
+        </button>
+
         <div className="flex flex-col gap-3">
           {brouillon.map((ligne, i) => (
             <div key={i} className="flex items-center gap-2 px-3 py-3 rounded-xl" style={{ background: "#FFFEFA", border: `1px solid ${COLORS.line}` }}>
@@ -123,9 +182,12 @@ export default function ScreenAjoutEleves({ classe, onRetour }) {
                   <span className="text-xs" style={{ fontFamily: "Inter, sans-serif", color: COLORS.text }}>
                     {el.nom} {el.prenoms}
                   </span>
-                  <span className="text-xs ml-auto" style={{ fontFamily: "IBM Plex Mono, monospace", color: COLORS.muted }}>
+                  <span className="text-xs ml-auto mr-2" style={{ fontFamily: "IBM Plex Mono, monospace", color: COLORS.muted }}>
                     {el.matricule}
                   </span>
+                  <button onClick={() => handleSupprimer(el.id)} disabled={suppressionEnCours === el.id}>
+                    <Trash2 size={14} color={COLORS.stamp} opacity={suppressionEnCours === el.id ? 0.4 : 1} />
+                  </button>
                 </div>
               ))}
             </div>

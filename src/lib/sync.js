@@ -176,6 +176,22 @@ export async function ajouterEleves(classeId, listeEleves) {
   return data;
 }
 
+// ---------- Suppression (nécessite d'être en ligne) ----------
+export async function supprimerClasse(classeId) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from("classes").delete().eq("id", classeId);
+  if (error) throw error;
+  await db.classes.delete(classeId);
+  await db.eleves.where("classe_id").equals(classeId).delete();
+}
+
+export async function supprimerEleve(eleveId, classeId) {
+  const supabase = getSupabase();
+  const { error } = await supabase.from("eleves").delete().eq("id", eleveId);
+  if (error) throw error;
+  await db.eleves.delete(eleveId);
+}
+
 // À appeler une fois au démarrage de l'app pour retenter la sync
 // automatiquement dès que le réseau revient.
 export function ecouterRetourReseau() {

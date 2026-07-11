@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Download, FileSpreadsheet } from "lucide-react";
 import { db } from "../lib/db";
@@ -11,8 +11,29 @@ export default function ScreenExport({ classe, onRetour }) {
   const [enCours, setEnCours] = useState(false);
 
   const eleves = useLiveQuery(() => db.eleves.where("classe_id").equals(classe.id).sortBy("nom"), [classe.id]) ?? [];
+  const matieres = useLiveQuery(() => db.matieres.toArray(), []) ?? [];
+  const typesEvalTous = useLiveQuery(() => db.types_evaluation.orderBy("ordre").toArray(), []) ?? [];
+  const niveauxEval = useLiveQuery(
+    () => db.niveaux_evaluations.where("niveau_id").equals(classe.niveau_id).toArray(),
+    [classe.niveau_id]
+  ) ?? [];
   const toutesLesNotes = useLiveQuery(() => db.notes.toArray(), []) ?? [];
+
+  const typesEvalAutorises = useMemo(() => {
+    const actifs = new Set(niveauxEval.filter((n) => n.actif).map((n) => n.type_evaluation_id));
+    return typesEvalTous.filter((t) => actifs.has(t.id));
+  }, [typesEvalTous, niveauxEval]);
+
+  const [typeEvalId, setTypeEvalId] = useState(null);
+  const typeEval = typesEvalAutorises.find((t) => t.id === (typeEvalId ?? typesEvalAutorises[0]?.id));
+
   const enAttente = toutesLesNotes.filter((n) => n.synced === 0).length;
+
+  function getNote(eleveId, matiereId) {
+    return toutesLesNotes.find(
+      (n) => n.eleve_id === eleveId && n.type_evaluation_id === typeEval?.id && n.matiere_id === matiereId
+    );
+  }
 
   async function handleExport() {
     setEnCours(true);
@@ -38,42 +59,95 @@ export default function ScreenExport({ classe, onRetour }) {
             {classe.nom} · {classe.annee_scolaire}
           </span>
         </div>
-        <h2 className="text-lg mt-1 pl-7" style={{ fontFamily: "Fraunces, serif", fontWeight: 600, color: COLORS.paper }}>
+        <h2 className="text-lg mt-1 pl-7 mb-3" style={{ fontFamily: "Fraunces, serif", fontWeight: 600, color: COLORS.paper }}>
           Aperçu du fichier
         </h2>
+
+        {typeEval && (
+          <div className="pl-7">
+            <select
+              value={typeEval.id}
+              onChange={(e) => setTypeEvalId(e.target.value)}
+              className="px-3 py-1.5 rounded-full text-xs outline-none"
+              style={{ background: COLORS.stamp, fontFamily: "Inter, sans-serif", fontWeight: 600, color: COLORS.paper, border: "none" }}
+            >
+              {typesEvalAutorises.map((t) => (
+                <option key={t.id} value={t.id} style={{ color: "#000" }}>
+                  {t.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 p-4 overflow-y-auto relative">
         <div className="flex items-center gap-2 mb-1">
           <FileSpreadsheet size={14} color={COLORS.muted} />
           <p className="text-xs" style={{ fontFamily: "Inter, sans-serif", color: COLORS.muted }}>
-            Une feuille par évaluation, au format ministère
+            {typesEvalAutorises.length} feuille(s) au total dans l'export — aperçu ci-dessous pour "{typeEval?.nom}"
           </p>
         </div>
 
         {enAttente > 0 && (
           <p className="text-xs mt-2" style={{ fontFamily: "Inter, sans-serif", color: COLORS.stamp }}>
-            {enAttente} note(s) pas encore synchronisée(s) — sera(ont) inclue(s) dans l'export local quand même.
+            {enAttente} note(s) pas encore synchronisée(s) — incluse(s) quand même dans l'export local.
           </p>
         )}
 
-        <div className="flex flex-col gap-2.5 mt-3">
-          {eleves.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: "#FFFEFA", border: `1px solid ${COLORS.line}` }}>
-              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#EAF0E9", color: "#3D6B4C", fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: 12 }}>
-                {initials(`${s.prenoms} ${s.nom}`)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="truncate" style={{ fontFamily: "Inter, sans-serif", fontWeight: 500, fontSize: 14, color: COLORS.text }}>
-                  {s.nom} {s.prenoms}
-                </p>
-                <p style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10, color: COLORS.muted }}>
-                  N° {s.matricule}
-                </p>
-              </div>
-            </div>
-          ))}
+        <div className="mt-3 rounded-lg overflow-x-auto" style={{ border: `1px solid ${COLORS.line}` }}>
+          <table className="w-full" style={{ borderCollapse: "collapse", fontFamily: "Inter, sans-serif" }}>
+            <thead>
+              <tr style={{ background: "#EDE9DA" }}>
+                <th className="text-left px-2 py-2 text-[10px] sticky left-0" style={{ background: "#EDE9DA", color: COLORS.muted, minWidth: 110 }}>
+                  Élève
+                </th>
+                {matieres.map((m) => (
+                  <th key={m.id} className="text-center px-2 py-2 text-[9px]" style={{ color: COLORS.muted, minWidth: 46 }}>
+                    {m.nom}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {eleves.map((s, i) => (
+                <tr key={s.id} style={{ background: i % 2 ? "#FBFAF5" : "#FFFEFA", borderTop: `1px solid ${COLORS.line}` }}>
+                  <td className="px-2 py-2 sticky left-0" style={{ background: i % 2 ? "#FBFAF5" : "#FFFEFA" }}>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#EAF0E9", color: "#3D6B4C", fontWeight: 700, fontSize: 9 }}>
+                        {initials(`${s.prenoms} ${s.nom}`)}
+                      </div>
+                      <span className="text-[11px] truncate" style={{ color: COLORS.text, maxWidth: 80 }}>
+                        {s.nom}
+                      </span>
+                    </div>
+                  </td>
+                  {matieres.map((m) => {
+                    const note = getNote(s.id, m.id);
+                    const valeur = note?.note_obtenue;
+                    return (
+                      <td
+                        key={m.id}
+                        className="text-center text-[11px] px-2 py-2"
+                        style={{
+                          fontFamily: "IBM Plex Mono, monospace",
+                          color: valeur !== null && valeur !== undefined ? COLORS.text : COLORS.line,
+                          fontWeight: valeur !== null && valeur !== undefined ? 600 : 400,
+                        }}
+                      >
+                        {valeur !== null && valeur !== undefined ? valeur : "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+
+        <p className="text-xs mt-4 opacity-70 leading-relaxed" style={{ fontFamily: "Inter, sans-serif", color: COLORS.muted }}>
+          Une feuille par évaluation, regroupées dans un seul classeur — au format du ministère. Les cases "—" seront vides dans le fichier exporté.
+        </p>
 
         {stamped && (
           <div

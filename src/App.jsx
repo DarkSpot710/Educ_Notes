@@ -70,7 +70,11 @@ export default function App() {
       )}
 
       {ecran === "ajoutEleves" && classeActive && (
-        <ScreenAjoutEleves classe={classeActive} onRetour={() => setEcran("classes")} />
+        <ScreenAjoutEleves
+          classe={classeActive}
+          onRetour={() => setEcran("classes")}
+          onAllerSaisie={() => setEcran("saisie")}
+        />
       )}
 
       {ecran === "saisie" && classeActive && (

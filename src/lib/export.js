@@ -1,6 +1,5 @@
 import * as XLSX from "xlsx";
 import { db } from "./db";
-
 // Génère le classeur Excel pour une classe : une feuille par évaluation
 // autorisée pour son niveau, avec colonnes "Note obtenue" / "Note perfectionnement"
 // par matière, dans le format attendu par le ministère.
@@ -52,4 +51,41 @@ export async function genererClasseurClasse(classeId) {
 
   const fileName = `notes_${classe.nom.replace(/\s+/g, "_")}_${classe.annee_scolaire}.xlsx`;
   XLSX.writeFile(workbook, fileName);
+}
+
+// Lit un fichier .xlsx/.csv envoyé par l'utilisateur et en extrait une liste
+// d'élèves. Accepte des en-têtes variés (Matricule/N°, Nom, Prénoms/Prénom),
+// insensible à la casse — pour pouvoir réutiliser directement le fichier
+// du ministère ou une liste maison.
+export async function parserFichierEleves(file) {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const feuille = workbook.Sheets[workbook.SheetNames[0]];
+  const lignes = XLSX.utils.sheet_to_json(feuille, { defval: "" });
+
+  function trouverColonne(ligne, candidats) {
+    const cles = Object.keys(ligne);
+    for (const candidat of candidats) {
+      const trouve = cles.find((k) => k.toLowerCase().trim().includes(candidat));
+      if (trouve) return trouve;
+    }
+    return null;
+  }
+
+  const eleves = [];
+  for (const ligne of lignes) {
+    const colMatricule = trouverColonne(ligne, ["matricule", "n°", "numero"]);
+    const colNom = trouverColonne(ligne, ["nom"]);
+    const colPrenoms = trouverColonne(ligne, ["prénom", "prenom"]);
+
+    const matricule = colMatricule ? String(ligne[colMatricule]).replace(/^'/, "").trim() : "";
+    const nom = colNom ? String(ligne[colNom]).trim() : "";
+    const prenoms = colPrenoms ? String(ligne[colPrenoms]).trim() : "";
+
+    if (matricule && nom) {
+      eleves.push({ matricule, nom, prenoms: prenoms || "-" });
+    }
+  }
+
+  return eleves;
 }

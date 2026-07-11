@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ChevronRight, Users, Wifi, WifiOff, LogOut, Plus } from "lucide-react";
+import { ChevronRight, Users, Wifi, WifiOff, LogOut, Plus, Trash2 } from "lucide-react";
 import { db } from "../lib/db";
 import { COLORS } from "../theme";
+import { supprimerClasse } from "../lib/sync";
 
 function useOnline() {
   const [online, setOnline] = React.useState(navigator.onLine);
@@ -23,8 +24,24 @@ export default function ScreenClasses({ onOpenClasse, onCreerClasse, onDeconnect
   const online = useOnline();
   const classes = useLiveQuery(() => db.classes.toArray(), []) ?? [];
   const eleves = useLiveQuery(() => db.eleves.toArray(), []) ?? [];
+  const [suppressionEnCours, setSuppressionEnCours] = useState(null);
+  const [erreur, setErreur] = useState(null);
 
   const effectifParClasse = (classeId) => eleves.filter((e) => e.classe_id === classeId).length;
+
+  async function handleSupprimer(e, classeId, nomClasse) {
+    e.stopPropagation();
+    if (!window.confirm(`Supprimer la classe "${nomClasse}" ? Tous ses élèves et notes seront supprimés définitivement.`)) return;
+    setSuppressionEnCours(classeId);
+    setErreur(null);
+    try {
+      await supprimerClasse(classeId);
+    } catch (err) {
+      setErreur(navigator.onLine ? err.message : "Connexion internet requise pour supprimer une classe.");
+    } finally {
+      setSuppressionEnCours(null);
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -49,6 +66,12 @@ export default function ScreenClasses({ onOpenClasse, onCreerClasse, onDeconnect
       </div>
 
       <div className="px-5 pt-5 flex-1">
+        {erreur && (
+          <p className="text-xs mb-3" style={{ fontFamily: "Inter, sans-serif", color: COLORS.stamp }}>
+            {erreur}
+          </p>
+        )}
+
         {classes.length === 0 && (
           <p className="text-sm mt-6" style={{ fontFamily: "Inter, sans-serif", color: COLORS.muted }}>
             Aucune classe assignée pour l'instant, ou pas encore synchronisée. Vérifie ta connexion et reconnecte-toi si besoin.
@@ -57,10 +80,10 @@ export default function ScreenClasses({ onOpenClasse, onCreerClasse, onDeconnect
 
         <div className="flex flex-col gap-3">
           {classes.map((c) => (
-            <button
+            <div
               key={c.id}
               onClick={() => onOpenClasse(c)}
-              className="text-left rounded-lg p-4 flex items-center gap-3 relative overflow-hidden"
+              className="text-left rounded-lg p-4 flex items-center gap-3 relative overflow-hidden cursor-pointer"
               style={{ background: "#FFFEFA", border: `1px solid ${COLORS.line}` }}
             >
               <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: COLORS.stamp }} />
@@ -77,8 +100,15 @@ export default function ScreenClasses({ onOpenClasse, onCreerClasse, onDeconnect
                   {c.annee_scolaire}
                 </p>
               </div>
+              <button
+                onClick={(e) => handleSupprimer(e, c.id, c.nom)}
+                disabled={suppressionEnCours === c.id}
+                className="p-1"
+              >
+                <Trash2 size={16} color={COLORS.stamp} opacity={suppressionEnCours === c.id ? 0.4 : 1} />
+              </button>
               <ChevronRight size={18} color={COLORS.muted} />
-            </button>
+            </div>
           ))}
         </div>
 
