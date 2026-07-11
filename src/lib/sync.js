@@ -4,18 +4,34 @@ import { db, getSession } from "./db";
 // ---------- Descendant : référentiels fixes (rarement modifiés) ----------
 export async function pullReferenceData() {
   const supabase = getSupabase();
+  const erreurs = [];
 
-  const { data: niveaux } = await supabase.from("niveaux").select("*");
+  const { data: niveaux, error: niveauxErr } = await supabase.from("niveaux").select("*");
+  if (niveauxErr) erreurs.push(`niveaux: ${niveauxErr.message}`);
   if (niveaux) await db.niveaux.bulkPut(niveaux);
 
-  const { data: matieres } = await supabase.from("matieres").select("*");
+  const { data: matieres, error: matieresErr } = await supabase.from("matieres").select("*");
+  if (matieresErr) erreurs.push(`matieres: ${matieresErr.message}`);
   if (matieres) await db.matieres.bulkPut(matieres);
 
-  const { data: typesEval } = await supabase.from("types_evaluation").select("*");
+  const { data: typesEval, error: typesEvalErr } = await supabase.from("types_evaluation").select("*");
+  if (typesEvalErr) erreurs.push(`types_evaluation: ${typesEvalErr.message}`);
   if (typesEval) await db.types_evaluation.bulkPut(typesEval);
 
-  const { data: niveauxEval } = await supabase.from("niveaux_evaluations").select("*");
+  const { data: niveauxEval, error: niveauxEvalErr } = await supabase.from("niveaux_evaluations").select("*");
+  if (niveauxEvalErr) erreurs.push(`niveaux_evaluations: ${niveauxEvalErr.message}`);
   if (niveauxEval) await db.niveaux_evaluations.bulkPut(niveauxEval);
+
+  const resume = {
+    niveaux: niveaux?.length ?? 0,
+    matieres: matieres?.length ?? 0,
+    types_evaluation: typesEval?.length ?? 0,
+    niveaux_evaluations: niveauxEval?.length ?? 0,
+    erreurs,
+  };
+
+  if (erreurs.length) console.error("pullReferenceData erreurs:", erreurs);
+  return resume;
 }
 
 // ---------- Descendant : classes + élèves assignés à la clé active ----------

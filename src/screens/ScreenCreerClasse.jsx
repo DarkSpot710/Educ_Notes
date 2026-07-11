@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ArrowLeft, School } from "lucide-react";
+import { ArrowLeft, School, RefreshCw } from "lucide-react";
 import { db, getSession } from "../lib/db";
 import { COLORS } from "../theme";
-import { creerClasse, compterClassesDeLaCle, pullClassesEtEleves } from "../lib/sync";
+import { creerClasse, compterClassesDeLaCle, pullReferenceData } from "../lib/sync";
 
 export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
   const niveaux = useLiveQuery(() => db.niveaux?.toArray?.() ?? [], []) ?? [];
@@ -13,6 +13,8 @@ export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
   const [quota, setQuota] = useState(null); // { utilisees, limite }
   const [erreur, setErreur] = useState(null);
   const [enCours, setEnCours] = useState(false);
+  const [diagnostic, setDiagnostic] = useState(null);
+  const [rechargeEnCours, setRechargeEnCours] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -21,6 +23,19 @@ export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
       setQuota({ utilisees, limite: session.limite_classes ?? null });
     })();
   }, []);
+
+  async function handleRecharger() {
+    setRechargeEnCours(true);
+    setDiagnostic(null);
+    try {
+      const resume = await pullReferenceData();
+      setDiagnostic(resume);
+    } catch (e) {
+      setDiagnostic({ erreurs: [e.message || "Erreur inconnue lors du rechargement"] });
+    } finally {
+      setRechargeEnCours(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!niveauId || !nom.trim()) {
@@ -86,7 +101,7 @@ export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
             <select
               value={niveauId}
               onChange={(e) => setNiveauId(e.target.value)}
-              className="w-full mt-2 mb-4 px-3 py-3 rounded-lg outline-none"
+              className="w-full mt-2 mb-2 px-3 py-3 rounded-lg outline-none"
               style={{ fontFamily: "Inter, sans-serif", border: `1px solid ${COLORS.line}`, background: "#FFFEFA" }}
             >
               <option value="">— Choisir —</option>
@@ -94,6 +109,30 @@ export default function ScreenCreerClasse({ onRetour, onClasseCreee }) {
                 <option key={n.id} value={n.id}>{n.nom}</option>
               ))}
             </select>
+
+            {niveaux.length === 0 && (
+              <div className="mb-4 p-3 rounded-lg" style={{ background: "#F1EFE6" }}>
+                <p className="text-xs mb-2" style={{ fontFamily: "Inter, sans-serif", color: COLORS.stamp }}>
+                  Aucun niveau chargé — clique pour diagnostiquer :
+                </p>
+                <button
+                  onClick={handleRecharger}
+                  disabled={rechargeEnCours}
+                  className="flex items-center gap-1.5 text-xs px-3 py-2 rounded"
+                  style={{ background: COLORS.ink, color: COLORS.paper, fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+                >
+                  <RefreshCw size={12} /> {rechargeEnCours ? "Vérification…" : "Recharger les données"}
+                </button>
+                {diagnostic && (
+                  <pre
+                    className="text-[10px] mt-2 p-2 rounded overflow-x-auto"
+                    style={{ background: "#FFFEFA", fontFamily: "IBM Plex Mono, monospace", color: COLORS.text, whiteSpace: "pre-wrap" }}
+                  >
+                    {JSON.stringify(diagnostic, null, 2)}
+                  </pre>
+                )}
+              </div>
+            )}
 
             <label className="text-xs uppercase tracking-wide" style={{ fontFamily: "Inter, sans-serif", color: COLORS.muted }}>
               Nom de la classe
