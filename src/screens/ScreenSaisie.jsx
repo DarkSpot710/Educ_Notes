@@ -8,7 +8,8 @@ import { enregistrerNoteLocale } from "../lib/sync";
 export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEleves }) {
   const eleves = useLiveQuery(() => db.eleves.where("classe_id").equals(classe.id).sortBy("nom"), [classe.id]) ?? [];
   const matieres = useLiveQuery(() => db.matieres.toArray(), []) ?? [];
-  const typesEvalTous = useLiveQuery(() => db.types_evaluation.orderBy("ordre").toArray(), []) ?? [];
+  const matieresBrutes = useLiveQuery(() => db.matieres.toArray(), []) ?? [];
+const matieres = [...matieresBrutes].sort((a, b) => (a.ordre ?? 99) - (b.ordre ?? 99));
   const niveauxEval = useLiveQuery(
     () => db.niveaux_evaluations.where("niveau_id").equals(classe.niveau_id).toArray(),
     [classe.niveau_id]
