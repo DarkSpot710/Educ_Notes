@@ -110,10 +110,25 @@ export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEl
         </button>
       </div>
 
-      {syncInfo && (
+     {syncInfo && (
         <p className="px-5 py-1 text-[10px]" style={{ fontFamily: "IBM Plex Mono, monospace", color: syncInfo.erreur ? COLORS.stamp : COLORS.muted, background: COLORS.paper }}>
           {syncInfo.erreur ? `Erreur sync: ${syncInfo.erreur}` : `${syncInfo.recuperees} note(s) récupérée(s) du serveur`}
         </p>
+      )}
+      <button
+        onClick={async () => {
+          const resultat = await pousserNotesEnAttente();
+          setPushInfo(resultat);
+        }}
+        className="mx-5 my-1 text-[10px] underline"
+        style={{ fontFamily: "Inter, sans-serif", color: COLORS.ink }}
+      >
+        Forcer l'envoi des notes en attente
+      </button>
+      {pushInfo && (
+        <pre className="mx-5 mb-2 p-2 text-[9px] rounded" style={{ background: "#F1EFE6", fontFamily: "IBM Plex Mono, monospace", whiteSpace: "pre-wrap" }}>
+          {JSON.stringify(pushInfo, null, 2)}
+        </pre>
       )}
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
