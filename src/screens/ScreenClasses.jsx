@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ChevronRight, Users, Wifi, WifiOff, LogOut, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState as useState2 } from "react";
 import { db } from "../lib/db";
 import { COLORS } from "../theme";
-import { supprimerClasse } from "../lib/sync";
+import { supprimerClasse, compterNotesEnAttente } from "../lib/sync";
 
 function useOnline() {
   const [online, setOnline] = React.useState(navigator.onLine);
@@ -26,6 +27,14 @@ export default function ScreenClasses({ onOpenClasse, onCreerClasse, onDeconnect
   const eleves = useLiveQuery(() => db.eleves.toArray(), []) ?? [];
   const [suppressionEnCours, setSuppressionEnCours] = useState(null);
   const [erreur, setErreur] = useState(null);
+  const [notesEnAttente, setNotesEnAttente] = useState(0);
+
+  useEffect(() => {
+    const maj = () => compterNotesEnAttente().then(setNotesEnAttente);
+    maj();
+    const interval = setInterval(maj, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const effectifParClasse = (classeId) => eleves.filter((e) => e.classe_id === classeId).length;
 
@@ -69,6 +78,12 @@ export default function ScreenClasses({ onOpenClasse, onCreerClasse, onDeconnect
         {erreur && (
           <p className="text-xs mb-3" style={{ fontFamily: "Inter, sans-serif", color: COLORS.stamp }}>
             {erreur}
+          </p>
+        )}
+
+        {notesEnAttente > 0 && (
+          <p className="text-xs mb-3" style={{ fontFamily: "Inter, sans-serif", color: online ? COLORS.ink : COLORS.stamp }}>
+            {notesEnAttente} note(s) en attente de synchronisation{online ? " — envoi en cours…" : " (hors ligne)"}
           </p>
         )}
 
