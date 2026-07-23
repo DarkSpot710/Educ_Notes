@@ -5,8 +5,15 @@ import { db } from "../lib/db";
 import { COLORS, initials } from "../theme";
 import { genererClasseurClasse } from "../lib/export";
 import { pousserNotesEnAttente } from "../lib/sync";
+import { useEffect } from "react";
+import { enregistrerNoteLocale, pullNotesClasse } from "../lib/sync";
 
 export default function ScreenExport({ classe, onRetour }) {
+  useEffect(() => {
+    if (navigator.onLine) {
+      pullNotesClasse(classe.id).catch(() => {});
+    }
+  }, [classe.id]);
   const [stamped, setStamped] = useState(false);
   const [enCours, setEnCours] = useState(false);
 
