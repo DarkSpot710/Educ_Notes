@@ -3,9 +3,15 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Check, FileSpreadsheet } from "lucide-react";
 import { db } from "../lib/db";
 import { COLORS, initials } from "../theme";
-import { enregistrerNoteLocale } from "../lib/sync";
+import { useEffect } from "react";
+import { enregistrerNoteLocale, pullNotesClasse } from "../lib/sync";
 
 export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEleves }) {
+  useEffect(() => {
+    if (navigator.onLine) {
+      pullNotesClasse(classe.id).catch(() => {});
+    }
+  }, [classe.id]);
   const eleves = useLiveQuery(() => db.eleves.where("classe_id").equals(classe.id).sortBy("nom"), [classe.id]) ?? [];
   const matieresBrutes = useLiveQuery(() => db.matieres.toArray(), []) ?? [];
   const matieres = [...matieresBrutes].sort((a, b) => (a.ordre ?? 99) - (b.ordre ?? 99));
