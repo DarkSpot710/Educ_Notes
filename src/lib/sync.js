@@ -121,13 +121,14 @@ export async function enregistrerNoteLocale({ eleve_id, type_evaluation_id, mati
 // ---------- Montant : pousse les notes en attente vers Supabase ----------
 export async function pousserNotesEnAttente() {
   const enAttente = await db.notes.where("synced").equals(0).toArray();
-  if (!enAttente.length) return { pushed: 0, failed: 0 };
+  if (!enAttente.length) return { pushed: 0, failed: 0, erreurs: [] };
 
   const supabase = getSupabase();
   const session = await getSession();
 
   let pushed = 0;
   let failed = 0;
+  const erreurs = [];
 
   for (const note of enAttente) {
     const { error } = await supabase.from("notes").upsert(
@@ -144,13 +145,15 @@ export async function pousserNotesEnAttente() {
 
     if (error) {
       failed += 1;
+      if (erreurs.length < 3) erreurs.push(error.message);
       continue;
     }
     await db.notes.update(note.localId, { synced: 1 });
     pushed += 1;
   }
 
-  return { pushed, failed };
+  if (erreurs.length) console.error("pousserNotesEnAttente erreurs:", erreurs);
+  return { pushed, failed, erreurs };
 }
 
 // ---------- Création d'une classe (nécessite d'être en ligne) ----------
