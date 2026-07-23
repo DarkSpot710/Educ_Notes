@@ -7,9 +7,11 @@ import { useEffect } from "react";
 import { enregistrerNoteLocale, pullNotesClasse } from "../lib/sync";
 
 export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEleves }) {
+  const [syncInfo, setSyncInfo] = useState(null);
+
   useEffect(() => {
     if (navigator.onLine) {
-      pullNotesClasse(classe.id).catch(() => {});
+      pullNotesClasse(classe.id).then(setSyncInfo).catch((e) => setSyncInfo({ erreur: e.message }));
     }
   }, [classe.id]);
   const eleves = useLiveQuery(() => db.eleves.where("classe_id").equals(classe.id).sortBy("nom"), [classe.id]) ?? [];
