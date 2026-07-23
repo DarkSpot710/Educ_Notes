@@ -67,21 +67,19 @@ export async function pullNotesClasse(classeId) {
 
   const eleves = await db.eleves.where("classe_id").equals(classeId).toArray();
   const eleveIds = eleves.map((e) => e.id);
-  if (!eleveIds.length) return;
+  if (!eleveIds.length) return { recuperees: 0, erreur: null };
 
   const { data: notesServeur, error } = await supabase
     .from("notes")
     .select("*")
     .in("eleve_id", eleveIds);
 
-  if (error) throw error;
-  if (!notesServeur) return;
+  if (error) return { recuperees: 0, erreur: error.message };
+  if (!notesServeur) return { recuperees: 0, erreur: null };
 
   for (const n of notesServeur) {
     const localId = `${n.eleve_id}_${n.type_evaluation_id}_${n.matiere_id}`;
     const local = await db.notes.get(localId);
-
-    // Ne jamais écraser une modification locale pas encore synchronisée.
     if (local && local.synced === 0) continue;
 
     await db.notes.put({
@@ -94,6 +92,8 @@ export async function pullNotesClasse(classeId) {
       updated_at: n.updated_at,
     });
   }
+
+  return { recuperees: notesServeur.length, erreur: null };
 }
 
 // ---------- Écriture locale (toujours en premier, online ou offline) ----------
@@ -216,7 +216,7 @@ export async function ajouterEleves(classeId, listeEleves) {
 // ---------- Suppression (nécessite d'être en ligne) ----------
 export async function supprimerClasse(classeId) {
   const supabase = getSupabase();
-  const { error } = await supabase.from("classes").delete().eq("id", classeId);
+  const { error } = await supabase.rpc("supprimer_classe_securise", { p_classe_id: classeId });
   if (error) throw error;
   await db.classes.delete(classeId);
   await db.eleves.where("classe_id").equals(classeId).delete();
@@ -224,7 +224,7 @@ export async function supprimerClasse(classeId) {
 
 export async function supprimerEleve(eleveId, classeId) {
   const supabase = getSupabase();
-  const { error } = await supabase.from("eleves").delete().eq("id", eleveId);
+  const { error } = await supabase.rpc("supprimer_eleve_securise", { p_eleve_id: eleveId });
   if (error) throw error;
   await db.eleves.delete(eleveId);
 }
