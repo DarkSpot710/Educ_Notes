@@ -198,4 +198,18 @@ export function ecouterRetourReseau() {
   window.addEventListener("online", () => {
     pousserNotesEnAttente().catch(() => {});
   });
+
+  // Retente aussi toutes les 20 secondes pendant que l'app est ouverte —
+  // utile si le réseau est instable (le navigateur croit être en ligne
+  // mais les requêtes échouent quand même).
+  setInterval(() => {
+    if (navigator.onLine) {
+      pousserNotesEnAttente().catch(() => {});
+    }
+  }, 20000);
+}
+
+// Nombre de notes en attente de synchronisation, pour affichage global.
+export async function compterNotesEnAttente() {
+  return db.notes.where("synced").equals(0).count();
 }
