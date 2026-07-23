@@ -103,12 +103,18 @@ export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEl
         </div>
       </div>
 
-      <div className="px-5 py-2.5 flex items-center justify-between text-xs sticky top-0 z-10" style={{ background: COLORS.paper, borderBottom: `1px solid ${COLORS.line}`, fontFamily: "Inter, sans-serif", color: COLORS.muted }}>
+     <div className="px-5 py-2.5 flex items-center justify-between text-xs sticky top-0 z-10" style={{ background: COLORS.paper, borderBottom: `1px solid ${COLORS.line}`, fontFamily: "Inter, sans-serif", color: COLORS.muted }}>
         <span>{filled}/{eleves.length} saisies</span>
         <button onClick={onGererEleves} style={{ color: COLORS.ink, fontWeight: 600 }}>
           Gérer les élèves
         </button>
       </div>
+
+      {syncInfo && (
+        <p className="px-5 py-1 text-[10px]" style={{ fontFamily: "IBM Plex Mono, monospace", color: syncInfo.erreur ? COLORS.stamp : COLORS.muted, background: COLORS.paper }}>
+          {syncInfo.erreur ? `Erreur sync: ${syncInfo.erreur}` : `${syncInfo.recuperees} note(s) récupérée(s) du serveur`}
+        </p>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <div className="flex flex-col gap-3">
