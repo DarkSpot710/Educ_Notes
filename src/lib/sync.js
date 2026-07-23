@@ -58,6 +58,43 @@ export async function pullClassesEtEleves() {
 
   return classes ?? [];
 }
+// Récupère depuis Supabase les notes déjà saisies pour les élèves d'une
+// classe (peu importe l'appareil qui les a saisies), et les fusionne dans
+// le cache local — sans jamais écraser une saisie locale pas encore
+// envoyée (pending), pour ne pas perdre de travail en cours.
+export async function pullNotesClasse(classeId) {
+  const supabase = getSupabase();
+
+  const eleves = await db.eleves.where("classe_id").equals(classeId).toArray();
+  const eleveIds = eleves.map((e) => e.id);
+  if (!eleveIds.length) return;
+
+  const { data: notesServeur, error } = await supabase
+    .from("notes")
+    .select("*")
+    .in("eleve_id", eleveIds);
+
+  if (error) throw error;
+  if (!notesServeur) return;
+
+  for (const n of notesServeur) {
+    const localId = `${n.eleve_id}_${n.type_evaluation_id}_${n.matiere_id}`;
+    const local = await db.notes.get(localId);
+
+    // Ne jamais écraser une modification locale pas encore synchronisée.
+    if (local && local.synced === 0) continue;
+
+    await db.notes.put({
+      localId,
+      eleve_id: n.eleve_id,
+      type_evaluation_id: n.type_evaluation_id,
+      matiere_id: n.matiere_id,
+      note_obtenue: n.note_obtenue,
+      synced: 1,
+      updated_at: n.updated_at,
+    });
+  }
+}
 
 // ---------- Écriture locale (toujours en premier, online ou offline) ----------
 export async function enregistrerNoteLocale({ eleve_id, type_evaluation_id, matiere_id, note_obtenue }) {
