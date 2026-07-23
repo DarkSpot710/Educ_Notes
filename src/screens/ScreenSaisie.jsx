@@ -118,8 +118,13 @@ export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEl
       )}
       <button
         onClick={async () => {
-          const resultat = await pousserNotesEnAttente();
-          setPushInfo(resultat);
+          setPushInfo({ statut: "en cours..." });
+          try {
+            const resultat = await pousserNotesEnAttente();
+            setPushInfo(resultat);
+          } catch (e) {
+            setPushInfo({ exception: e.message || String(e) });
+          }
         }}
         className="mx-5 my-1 text-[10px] underline"
         style={{ fontFamily: "Inter, sans-serif", color: COLORS.ink }}
