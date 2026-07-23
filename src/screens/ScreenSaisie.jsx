@@ -8,6 +8,7 @@ import { enregistrerNoteLocale, pullNotesClasse, pousserNotesEnAttente } from ".
 
 export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEleves }) {
   const [syncInfo, setSyncInfo] = useState(null);
+  const [pushInfo, setPushInfo] = useState(null);
 
   useEffect(() => {
     if (navigator.onLine) {
