@@ -4,7 +4,7 @@ import { ArrowLeft, Check, FileSpreadsheet } from "lucide-react";
 import { db } from "../lib/db";
 import { COLORS, initials } from "../theme";
 import { useEffect } from "react";
-import { enregistrerNoteLocale, pullNotesClasse } from "../lib/sync";
+import { enregistrerNoteLocale, pullNotesClasse, pousserNotesEnAttente } from "../lib/sync";
 
 export default function ScreenSaisie({ classe, onRetour, onVoirExport, onGererEleves }) {
   const [syncInfo, setSyncInfo] = useState(null);
